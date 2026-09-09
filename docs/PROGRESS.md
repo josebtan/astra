@@ -40,12 +40,20 @@ Se verificaron así: `core/model` completo, `SessionFileStore` (con directorios 
 
 **Pendiente:** abrir el proyecto en Android Studio (con acceso normal a internet) para confirmar `./gradlew :core:test` y `./gradlew :app:assembleDebug` con el Android Gradle Plugin real.
 
+## Añadido: persistencia real con Room (`core/storage/db`)
+
+- **`ObservationSessionEntity`** / **`ImageFrameEntity`** (+ `ImageMetadataEntity` embebida) — modelo de persistencia Room, separado deliberadamente del modelo de dominio (`core/model`) para que el esquema en disco pueda evolucionar sin tocar la lógica de negocio.
+- **`Mappers.kt`** — conversión dominio ↔ entidad en ambas direcciones.
+- **`ObservationSessionDao`** / **`ImageFrameDao`** — operaciones CRUD suspendidas.
+- **`AstraDatabase`** — base de datos Room (`astra.db`, versión 1).
+- **`RoomSessionRepository`** — implementa `SessionRepository` (interfaz ya definida en `core/storage`, sin dependencia de Room) usando los DAOs. Los `frameIds` de una sesión se derivan consultando los frames por `sessionId`, no se guardan en la fila de la sesión.
+
+## Verificación de Room: Robolectric, no emulador
+
+Room requiere procesamiento de anotaciones (KSP) y una base de datos SQLite real — no se puede probar con `kotlinc` suelto como el resto de `core/model`. En vez de dejarlo sin probar, se añadió **Robolectric** (`org.robolectric:robolectric`), que corre SQLite real dentro de la JVM del test, sin necesitar un emulador de Android. `RoomSessionRepositoryTest` usa una base de datos Room en memoria y prueba: crear sesión, añadir frames y verificar que aparecen en `frameIds`, actualizar estado/tiempo de integración, id desconocido devuelve `null`, y listar todas las sesiones.
+
+Esto **no se pudo ejecutar en este sandbox** (KSP + Robolectric necesitan descargar artefactos de Maven Central/Google, fuera de los dominios permitidos aquí) — la verificación real vino del run de GitHub Actions después del push (ver más abajo).
+
 ## Siguiente paso
 
-Según el roadmap (sección 26): persistencia de `ObservationSession`/`ImageFrame` con Room (entidades, DAOs, mapeo a los modelos de dominio de `core/model`), para poder crear y recuperar sesiones reales entre lanzamientos de la app — hasta ahora solo viven en memoria.
-
-## CI: GitHub Actions
-
-Se añadió `.github/workflows/android-ci.yml`: en cada push/PR a `main`, corre `./gradlew :core:testDebugUnitTest` y `./gradlew :app:assembleDebug` en un runner de Ubuntu con Android SDK. Para que esto funcione hacía falta el Gradle Wrapper real (`gradlew`, `gradlew.bat`, `gradle/wrapper/gradle-wrapper.jar` + `.properties`, Gradle 8.7), que se añadió al repo — el `.jar` se obtuvo directamente del repositorio oficial de Gradle en GitHub (`raw.githubusercontent.com`, dominio permitido en este sandbox), ya que este entorno no tiene acceso a `services.gradle.org`.
-
-Esto **no se pudo ejecutar dentro de este sandbox** (sin acceso a Android SDK ni a Maven de Google) — quedará confirmado con el primer run real en GitHub Actions tras el push.
+Con sesiones y frames ya persistidos, el roadmap (sección 31, V0.2) apunta a **Camera** — implementar `AndroidCameraDevice` (Camera2 API) como primera implementación real de la interfaz `CameraDevice`, con captura RAW/DNG funcional.
