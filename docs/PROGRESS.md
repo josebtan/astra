@@ -73,6 +73,25 @@ Nuevo módulo Gradle **`camera`**, primer consumidor real de la interfaz `Camera
 
 **No verificable aquí** (necesita un HAL de Camera2 real — dispositivo o emulador): todo `AndroidCameraDevice.kt` (apertura de cámara, sesión de captura, escritura de DNG). Se compilará en CI (GitHub Actions ya tiene Android SDK), pero el comportamiento real de la cámara solo se puede confirmar en un dispositivo/emulador de verdad — CI no tiene hardware de cámara.
 
+## Añadido: V0.3 — RAW Engine (`raw` module, `DngTiffReader`)
+
+Nuevo módulo Gradle **`raw`**: decodifica los DNG que `AndroidCameraDevice` ya escribe hacia `LinearImage`, el tipo de dato que van a consumir calibración/registro/stacking (roadmap sección 7).
+
+- **`LinearImage`** (nuevo, en `core/model`) — `width`, `height`, `channels`, `bitDepth`, `data: FloatArray`. Es una `class` normal, no `data class`: comparar `FloatArray` por `equals()` generado compararía por referencia, no por contenido — se añadió `contentEquals()` explícito para eso.
+- **`DngTiffReader`** — parser mínimo de TIFF/DNG, **100% Kotlin puro** (`java.io`/`java.nio`, sin ningún import de `android.*`). Deliberadamente acotado: un solo IFD, una sola tira sin comprimir, 8/16 bits por muestra — exactamente lo que produce `DngCreator` en el pipeline de captura. No es un parser TIFF/DNG general (no soporta múltiples tiras, compresión, sub-IFDs ni extracción del patrón CFA — eso es un paso de debayering futuro).
+- Linealización: `(raw - blackLevel) / (whiteLevel - blackLevel)`, recortado a `[0,1]`.
+
+## Verificación: esta vez de punta a punta, con archivos reales
+
+Como `DngTiffReader` no depende de Android, pude construir a mano — byte por byte — archivos DNG/TIFF mínimos sintéticos dentro del test (`DngTiffReaderTest`) y verificar que el parser los lee correctamente: valores en el límite negro/blanco, recorte de valores fuera de rango, rechazo explícito de compresión no soportada, y valores por defecto cuando faltan las etiquetas BlackLevel/WhiteLevel.
+
+```bash
+./scripts/verify-raw-jvm.sh
+# -> OK (4 tests)
+```
+
+Este es el primer módulo del pipeline de procesamiento (a diferencia de `camera`) que se pudo verificar **completamente** en este sandbox, sin depender de CI para confirmar que la lógica funciona.
+
 ## Siguiente paso
 
-Con captura RAW funcional, según el roadmap (V0.3): **RAW Engine** — parser DNG, decodificación a `LinearImage` (linear, bit depth conocido), histograma. Esto convierte el archivo DNG crudo en datos que el resto del pipeline (calibración, stacking) puede usar.
+Con RAW ya decodificado a `LinearImage`, el roadmap (V0.4) apunta a **Calibration**: `BiasCalibration`, `DarkCalibration`, `FlatCalibration` y `DefectCorrection` (sección 10-11) — restar dark/bias, dividir por flat, y generar el mapa de píxeles defectuosos del sensor. Esto también es aritmética pura sobre `LinearImage`, así que debería poder verificarse igual de a fondo que el RAW engine.

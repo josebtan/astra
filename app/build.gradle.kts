@@ -28,6 +28,7 @@ android {
 dependencies {
     implementation(project(":core"))
     implementation(project(":camera"))
+    implementation(project(":raw"))
 }
 
 // `app` is intentionally minimal for V0.1: it only needs to exist so the
