@@ -28,18 +28,20 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Run core unit tests (JVM, no device needed)
-        run: ./gradlew :core:testDebugUnitTest --stacktrace
+      - name: Run unit tests (core + camera)
+        run: ./gradlew :core:testDebugUnitTest :camera:testDebugUnitTest --stacktrace
 
       - name: Assemble debug APK
         run: ./gradlew :app:assembleDebug --stacktrace
 
-      - name: Upload core test report
+      - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: core-test-results
-          path: core/build/reports/tests/testDebugUnitTest
+          name: unit-test-results
+          path: |
+            core/build/reports/tests/testDebugUnitTest
+            camera/build/reports/tests/testDebugUnitTest
           if-no-files-found: ignore
 
       - name: Upload debug APK
