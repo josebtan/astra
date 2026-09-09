@@ -12,20 +12,34 @@
   - `CameraDevice` — interfaz común para todas las fuentes de imagen
 - **Tests unitarios** (`ObservationSessionTest`) verificando que una sesión nace vacía/trazable y que un frame referencia correctamente su sesión y metadata.
 
+## Añadido: `core/storage` (RAW/WORK/RESULTS) y ajustes de usuario persistentes
+
+- **`SessionFileStore`** — crea y gestiona `RAW/ WORK/ RESULTS/` por sesión (roadmap sección 4). Protege contra sobrescribir un RAW ya existente.
+- **`UserSettings`** — todo lo que el usuario puede configurar y que ASTRA debe recordar entre lanzamientos: ruta de almacenamiento, ISO/exposición/formato RAW por defecto, última cámara usada, tema, modo Scientific/Visualization por defecto.
+- **`SettingsRepository`** (interfaz) + **`SettingsListener`** — contrato de persistencia y notificación de cambios de ajustes, sin dependencia de Android, para que sea testeable en Kotlin puro.
+- **`InMemorySettingsRepository`** — implementación en memoria, usada en tests y previews.
+- **`DataStoreSettingsRepository`** — implementación real con Jetpack DataStore, la que efectivamente persiste los ajustes en disco en el dispositivo.
+
 ## Verificación realizada en este entorno
 
-Este entorno no tiene acceso a los repositorios de Google/Maven Central necesarios para ejecutar Gradle con el Android Gradle Plugin real, así que la verificación se hizo directamente con `kotlinc` + `junit4` (instalados vía `apt`):
+Este sandbox no tiene acceso a los repositorios de Google/Maven Central necesarios para ejecutar Gradle con el Android Gradle Plugin real. Para verificar de verdad (no solo "a ojo") el código independiente de Android, se descargó el compilador **Kotlin 1.9.24 real** (el mismo que usa el proyecto) desde GitHub Releases, más `junit4`, `kotlinx-coroutines-core` y `atomicfu` vía `apt`:
 
 ```bash
-kotlinc core/src/main/kotlin/com/astra/core/model/*.kt -d out/
-kotlinc -cp out/:junit4.jar core/src/test/kotlin/.../ObservationSessionTest.kt -d test-out/
-java -cp out/:test-out/:junit4.jar:hamcrest-core.jar:kotlin-stdlib.jar \
-  org.junit.runner.JUnitCore com.astra.core.model.ObservationSessionTest
-# -> OK (2 tests)
+# ver scripts/verify-core-jvm.sh para el detalle reproducible
+./scripts/verify-core-jvm.sh
+# -> Compiling main sources / Compiling tests / Running tests
+# -> OK (12 tests)
 ```
 
-**Pendiente:** abrir el proyecto en Android Studio (con acceso normal a internet) para confirmar que `./gradlew :core:test` y `./gradlew :app:assembleDebug` funcionan con el Android Gradle Plugin real. La lógica y sintaxis Kotlin ya están validadas; lo que falta es la resolución de dependencias de Android, que este sandbox no puede hacer.
+Se verificaron así: `core/model` completo, `SessionFileStore` (con directorios temporales reales), y `InMemorySettingsRepository` (persistencia en memoria + notificación a listeners).
+
+**No verificable en este sandbox** (requieren Android runtime real, sin red a Maven de Google):
+- `DataStoreSettingsRepository` (Jetpack DataStore)
+- Cualquier futura entidad/DAO de Room
+- Los módulos `app`/`core` como Android Library/Application vía `./gradlew`
+
+**Pendiente:** abrir el proyecto en Android Studio (con acceso normal a internet) para confirmar `./gradlew :core:test` y `./gradlew :app:assembleDebug` con el Android Gradle Plugin real.
 
 ## Siguiente paso
 
-Según el roadmap (sección 36/9): `core/storage` — estructura de carpetas `RAW/ WORK/ RESULTS/` y persistencia de `ObservationSession` (Room), para poder crear y recuperar sesiones de verdad, no solo tener las clases en memoria.
+Según el roadmap (sección 26): persistencia de `ObservationSession`/`ImageFrame` con Room (entidades, DAOs, mapeo a los modelos de dominio de `core/model`), para poder crear y recuperar sesiones reales entre lanzamientos de la app — hasta ahora solo viven en memoria.
