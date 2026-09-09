@@ -43,3 +43,9 @@ Se verificaron así: `core/model` completo, `SessionFileStore` (con directorios 
 ## Siguiente paso
 
 Según el roadmap (sección 26): persistencia de `ObservationSession`/`ImageFrame` con Room (entidades, DAOs, mapeo a los modelos de dominio de `core/model`), para poder crear y recuperar sesiones reales entre lanzamientos de la app — hasta ahora solo viven en memoria.
+
+## CI: GitHub Actions
+
+Se añadió `.github/workflows/android-ci.yml`: en cada push/PR a `main`, corre `./gradlew :core:testDebugUnitTest` y `./gradlew :app:assembleDebug` en un runner de Ubuntu con Android SDK. Para que esto funcione hacía falta el Gradle Wrapper real (`gradlew`, `gradlew.bat`, `gradle/wrapper/gradle-wrapper.jar` + `.properties`, Gradle 8.7), que se añadió al repo — el `.jar` se obtuvo directamente del repositorio oficial de Gradle en GitHub (`raw.githubusercontent.com`, dominio permitido en este sandbox), ya que este entorno no tiene acceso a `services.gradle.org`.
+
+Esto **no se pudo ejecutar dentro de este sandbox** (sin acceso a Android SDK ni a Maven de Google) — quedará confirmado con el primer run real en GitHub Actions tras el push.

@@ -2,7 +2,9 @@
 
 Astronomical Science & Tracking Research Application — plataforma móvil (Android) para adquisición, calibración, procesamiento y análisis científico de imágenes astronómicas.
 
-Este repositorio está en blanco (esqueleto de módulos, sin código todavía). Contiene la documentación fundacional del proyecto:
+![Android CI](https://github.com/josebtan/astra/actions/workflows/android-ci.yml/badge.svg)
+
+Este repositorio contiene la documentación fundacional del proyecto y el desarrollo en curso:
 
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — visión, arquitectura completa y roadmap de versiones (V0.1 → V2.0).
 - [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md) — especificación de requerimientos funcionales y no funcionales.
@@ -25,6 +27,21 @@ astra/
 ├── pipeline/       # pipelines de procesamiento reproducibles
 ├── ui/             # Jetpack Compose UI
 └── docs/           # documentación del proyecto
+```
+
+## Compilar y probar
+
+CI en GitHub Actions (`.github/workflows/android-ci.yml`) corre en cada push/PR a `main`: tests unitarios de `core` y build del APK debug.
+
+Localmente, con Android Studio:
+```bash
+./gradlew :core:testDebugUnitTest
+./gradlew :app:assembleDebug
+```
+
+Verificación rápida sin Android SDK (útil en entornos sin acceso a Google Maven — ver `docs/PROGRESS.md`):
+```bash
+./scripts/verify-core-jvm.sh
 ```
 
 ## Estado
