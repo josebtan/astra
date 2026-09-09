@@ -18,8 +18,9 @@ rootProject.name = "astra"
 
 include(":app")
 include(":core")
+include(":camera")
 
 // Modules below are declared as they are implemented, following the
-// roadmap order (see docs/ROADMAP.md, section 31): camera -> raw ->
-// calibration -> image -> astrometry -> astronomy -> detection -> catalog
-// -> fits -> pipeline -> ui.
+// roadmap order (see docs/ROADMAP.md, section 31): raw -> calibration ->
+// image -> astrometry -> astronomy -> detection -> catalog -> fits ->
+// pipeline -> ui.

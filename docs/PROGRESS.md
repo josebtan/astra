@@ -54,6 +54,25 @@ Room requiere procesamiento de anotaciones (KSP) y una base de datos SQLite real
 
 Esto **no se pudo ejecutar en este sandbox** (KSP + Robolectric necesitan descargar artefactos de Maven Central/Google, fuera de los dominios permitidos aquí) — la verificación real vino del run de GitHub Actions después del push (ver más abajo).
 
+## Añadido: V0.2 — Camera (`camera` module, `AndroidCameraDevice`)
+
+Nuevo módulo Gradle **`camera`**, primer consumidor real de la interfaz `CameraDevice` (roadmap sección 5). Por ahora solo cámara del teléfono — USB/astro quedan para más adelante, detrás de la misma interfaz.
+
+- **`AndroidCameraDevice`** — implementación con Camera2: `connect()`/`disconnect()` (abre/cierra el dispositivo con `CameraManager`), `capture()` (crea sesión de captura, dispara con `CONTROL_AE_MODE_OFF` + exposición/ISO manuales del `CaptureSettings`, escribe DNG con `DngCreator` usando el `TotalCaptureResult` real, arma el `ImageFrame` con metadata), `startSequence()`/`stopSequence()`, `getStatus()`.
+  - `capture()` es síncrona de cara al llamador (como pide la interfaz `CameraDevice`) aunque Camera2 es 100% basado en callbacks — internamente bloquea con un `Semaphore` hasta tener imagen + resultado de captura. **Debe llamarse desde un hilo de fondo**, nunca desde el hilo principal.
+  - `startPreview()`/`stopPreview()` **no están implementados todavía** — Camera2 necesita un `Surface` que vendrá de la capa `ui` (que no existe aún). Lanzan `UnsupportedOperationException` con nota explicando por qué. No bloquea el milestone: la prioridad de la sección 42 es captura + trazabilidad, no preview.
+- **`CameraSensorSpec` + `mapToCapabilities()`** — lógica pura (sin ningún import de `android.*`) que convierte los valores crudos de `CameraCharacteristics` en `CameraCapabilities`: bit depth derivado del white level, conversión ns→s del rango de exposición, defaults correctos para cámara de teléfono (sin sensor de temperatura, sin cooling, sin binning — igual que el ejemplo del POCO X7 Pro en la sección 6 del roadmap).
+
+## Verificación
+
+**Sí verificable en este sandbox** (lógica pura, sin Android): `mapToCapabilities()` — 7 tests reales cubriendo bit depth, conversión de unidades, rangos ISO faltantes/presentes, y los defaults de cámara de teléfono.
+```bash
+./scripts/verify-camera-jvm.sh
+# -> OK (7 tests)
+```
+
+**No verificable aquí** (necesita un HAL de Camera2 real — dispositivo o emulador): todo `AndroidCameraDevice.kt` (apertura de cámara, sesión de captura, escritura de DNG). Se compilará en CI (GitHub Actions ya tiene Android SDK), pero el comportamiento real de la cámara solo se puede confirmar en un dispositivo/emulador de verdad — CI no tiene hardware de cámara.
+
 ## Siguiente paso
 
-Con sesiones y frames ya persistidos, el roadmap (sección 31, V0.2) apunta a **Camera** — implementar `AndroidCameraDevice` (Camera2 API) como primera implementación real de la interfaz `CameraDevice`, con captura RAW/DNG funcional.
+Con captura RAW funcional, según el roadmap (V0.3): **RAW Engine** — parser DNG, decodificación a `LinearImage` (linear, bit depth conocido), histograma. Esto convierte el archivo DNG crudo en datos que el resto del pipeline (calibración, stacking) puede usar.
