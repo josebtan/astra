@@ -1,0 +1,9 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application
+        android:label="ASTRA"
+        android:allowBackup="true">
+        <!-- MainActivity / Compose UI is added once V0.6 (Quality Analysis)
+             is reached and there is a session-management flow to show.
+             See docs/ROADMAP.md, section 31. -->
+    </application>
+</manifest>
