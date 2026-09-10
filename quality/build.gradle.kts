@@ -26,5 +26,8 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
 }
 
-// V0.6 Frame Quality Analyzer. Pure Kotlin arithmetic over one LinearImage;
-// no Android dependencies, so the scientific metrics are independently testable.
+// V0.6 Frame Quality Analyzer.
+//
+// The module deliberately depends only on :core. All quality metrics are
+// computed from LinearImage, keeping the scientific layer independent from
+// Android/UI and therefore easy to verify with deterministic JVM tests.
