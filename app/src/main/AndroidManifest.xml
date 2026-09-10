@@ -1,9 +1,21 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="ASTRA"
+        android:label="@string/app_name"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:theme="@style/Theme.Astra"
         android:allowBackup="true">
-        <!-- MainActivity / Compose UI is added once V0.6 (Quality Analysis)
-             is reached and there is a session-management flow to show.
-             See docs/ROADMAP.md, section 31. -->
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- The real capture screen replaces MainActivity once the `ui`
+             module exists (roadmap section 37). -->
     </application>
 </manifest>

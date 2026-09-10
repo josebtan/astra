@@ -92,6 +92,37 @@ Como `DngTiffReader` no depende de Android, pude construir a mano — byte por b
 
 Este es el primer módulo del pipeline de procesamiento (a diferencia de `camera`) que se pudo verificar **completamente** en este sandbox, sin depender de CI para confirmar que la lógica funciona.
 
+## Añadido: ícono de la app + pantalla de progreso (para que la APK muestre algo al abrir)
+
+Hasta ahora toda la app era lógica interna sin ninguna pantalla — por eso al instalar el APK no pasaba nada al abrirlo: no había actividad declarada como *launcher*.
+
+- **Ícono adaptativo** (`app/src/main/res/mipmap-anydpi-v26/`) — vector, sin depender de imágenes externas: fondo azul noche + estrella de 4 puntas. Como `minSdk=26`, no hace falta generar PNGs de respaldo para versiones antiguas de Android.
+- **`MainActivity`** — pantalla temporal (no es el módulo `ui` real del roadmap, que sigue pendiente) que muestra el estado de cada milestone del roadmap (✓ hecho / … en curso / — pendiente). Sirve para: (1) confirmar que la app instala y corre, (2) ver de un vistazo en qué va el desarrollo cada vez que se abre.
+- Tema oscuro simple (`Theme.Astra`), sin dependencia de AppCompat — no hacía falta para una pantalla tan simple, y evita añadir una dependencia más que verificar.
+
+**No verificable en este sandbox** (necesita build+render real de Android): tanto el ícono como la actividad se confirman con el run de GitHub Actions (compilación) — para verlos de verdad hay que instalar el APK en un teléfono o emulador.
+
+## Añadido: V0.4 — Calibration (`calibration` module)
+
+Motor de calibración **automático** con **feedback estructurado** para el usuario (pedido explícito):
+
+- **`MasterFrameBuilder`** — combina múltiples frames (bias/dark/flat) por mediana por píxel. La mediana rechaza outliers (un rayo cósmico, una toma mala) sin necesitar ningún parámetro que ajustar.
+- **`DefectMapBuilder`** — detecta píxeles calientes/muertos automáticamente usando **mediana + MAD** (median absolute deviation), no media/desviación estándar clásica. Esto importa: con media/stddev, un solo píxel muy caliente infla la desviación estándar y se enmascara a sí mismo (y a otros defectos) — lo descubrí con un test que fallaba de verdad. Mediana/MAD es robusta a esto.
+- **`DefectCorrector`** — reemplaza cada píxel defectuoso por la mediana de sus vecinos no defectuosos (fallback a la mediana global si el vecindario también está afectado).
+- **`CalibrationEngine`** — orquesta todo automáticamente: usa los frames de calibración que estén disponibles para la sesión (ninguna selección manual, ningún parámetro obligatorio), aplica bias → dark → flat → corrección de defectos en el orden correcto, y **siempre** devuelve un `CalibrationReport` con:
+  - qué pasos se aplicaron y cuáles se saltaron (y por qué — ej. "no hay frames de flat, paso omitido")
+  - cuántos defectos se detectaron/corrigieron
+  - señal media antes/después
+  - `toUserMessage()` — texto plano listo para mostrar en la UI
+
+## Verificación: encontró un bug de verdad
+
+Los primeros tests de `DefectMapBuilder` **fallaron** con el enfoque media/stddev original (0 defectos detectados donde debía haber 2) — quedó documentado arriba por qué, y se corrigió antes de seguir. Los 13 tests después de la corrección:
+```bash
+./scripts/verify-calibration-jvm.sh
+# -> OK (13 tests)
+```
+
 ## Siguiente paso
 
-Con RAW ya decodificado a `LinearImage`, el roadmap (V0.4) apunta a **Calibration**: `BiasCalibration`, `DarkCalibration`, `FlatCalibration` y `DefectCorrection` (sección 10-11) — restar dark/bias, dividir por flat, y generar el mapa de píxeles defectuosos del sensor. Esto también es aritmética pura sobre `LinearImage`, así que debería poder verificarse igual de a fondo que el RAW engine.
+Con la calibración lista, el roadmap (V0.5) apunta a **Stacking** — combinar múltiples light frames ya calibrados en una sola imagen integrada (Mean, Median, Sigma Clip). Reutiliza directamente `MasterFrameBuilder`/lógica similar sobre frames ya calibrados en vez de crudos.

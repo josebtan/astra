@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Faint orbit ring behind the star, evokes a telescope field of view -->
+    <path
+        android:pathData="M54,20 A34,34 0 1,1 53.9,20"
+        android:strokeColor="#6C8CFF"
+        android:strokeWidth="1.6"
+        android:strokeAlpha="0.55"
+        android:fillColor="#00000000" />
+
+    <!-- Small distant star -->
+    <path
+        android:pathData="M78,32 L80,37 L85,39 L80,41 L78,46 L76,41 L71,39 L76,37 Z"
+        android:fillColor="#F5F7FF"
+        android:fillAlpha="0.85" />
+
+    <!-- Main 4-point star (sparkle), centered in the adaptive-icon safe zone -->
+    <path
+        android:pathData="M54,21 L64,44 L87,54 L64,64 L54,87 L44,64 L21,54 L44,44 Z"
+        android:fillColor="#F5F7FF" />
+</vector>
