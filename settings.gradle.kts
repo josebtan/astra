@@ -22,6 +22,7 @@ include(":camera")
 include(":raw")
 include(":calibration")
 include(":stacking")
+include(":quality")
 
 // Modules below are declared as they are implemented, following the
 // roadmap order (see docs/ROADMAP.md, section 31): astrometry ->
