@@ -29,6 +29,8 @@ import com.astra.core.storage.db.RoomSessionRepository
 import com.astra.core.storage.settings.DataStoreSettingsRepository
 import com.astra.core.storage.settings.SettingsRepository
 import com.astra.raw.DngTiffReader
+import com.astra.stacking.StackingEngine
+import com.astra.stacking.StackingMethod
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -163,6 +165,9 @@ class MainActivity : Activity() {
         root.addView(labButton("Autotest de calibración (datos sintéticos)") {
             runInBackground("Autotest de calibración") { calibrationAutotestReport() }
         })
+        root.addView(labButton("Autotest de stacking (datos sintéticos)") {
+            runInBackground("Autotest de stacking") { stackingAutotestReport() }
+        })
         root.addView(labButton("Crear sesión de prueba y releerla (Room)") {
             runInBackground("Sesión + persistencia") { sessionPersistenceReport() }
         })
@@ -230,7 +235,7 @@ class MainActivity : Activity() {
         Milestone("V0.2 Camera — captura RAW real (solo cámara del teléfono)", Status.DONE),
         Milestone("V0.3 RAW Engine — decodificación DNG a LinearImage", Status.DONE),
         Milestone("V0.4 Calibration — bias/dark/flat + corrección de defectos", Status.DONE),
-        Milestone("V0.5 Stacking", Status.PENDING),
+        Milestone("V0.5 Stacking — Mean/Median/Sigma Clip", Status.DONE),
         Milestone("V0.6 Quality Analysis", Status.PENDING),
         Milestone("V0.7 Astrometry", Status.PENDING),
         Milestone("V0.8 Astronomy Engine", Status.PENDING),
@@ -361,6 +366,20 @@ class MainActivity : Activity() {
             append(result.report.toUserMessage())
             appendLine("Media de señal antes: ${result.report.meanSignalBefore}")
             appendLine("Media de señal después: ${result.report.meanSignalAfter}")
+        }
+    }
+
+    private fun stackingAutotestReport(): String {
+        // Background tightly clustered + one clear outlier frame, same
+        // pattern proven in StackingEngineTest's sigma-clip case.
+        fun image(value: Float) = LinearImage(3, 3, 1, 16, FloatArray(9) { value })
+        val frames = listOf(image(0.30f), image(0.31f), image(0.29f), image(0.30f), image(0.85f))
+
+        val result = StackingEngine.stack(frames, StackingMethod.SIGMA_CLIP, sigmaThreshold = 1.5)
+
+        return buildString {
+            append(result.report.toUserMessage())
+            appendLine("Valor por píxel (esperado ~0.30, sin el outlier 0.85): ${result.stackedImage.data[0]}")
         }
     }
 

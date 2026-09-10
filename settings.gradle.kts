@@ -21,7 +21,8 @@ include(":core")
 include(":camera")
 include(":raw")
 include(":calibration")
+include(":stacking")
 
 // Modules below are declared as they are implemented, following the
-// roadmap order (see docs/ROADMAP.md, section 31): image -> astrometry ->
+// roadmap order (see docs/ROADMAP.md, section 31): astrometry ->
 // astronomy -> detection -> catalog -> fits -> pipeline -> ui.

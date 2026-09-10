@@ -159,3 +159,20 @@ Sigue siendo un parser acotado (solo lee el primer elemento de un tag con count>
 ## Siguiente paso
 
 Seguir probando en el dispositivo real (captura, sesión, ajustes) y corrigiendo lo que aparezca, antes de avanzar a V0.5 (Stacking).
+
+## Añadido: V0.5 — Stacking (`stacking` module)
+
+- **`StackingEngine`** — combina múltiples light frames ya calibrados en una sola imagen integrada. Soporta `MEAN`, `MEDIAN` y `SIGMA_CLIP` (el alcance MVP exacto que pide la sección 12 del roadmap; `WEIGHTED_MEAN`/`MIN`/`MAX` quedan para después).
+- Sigma clip de un solo paso: excluye muestras a más de `sigmaThreshold` desviaciones estándar de la media, y reporta cuántas muestras se rechazaron.
+- **`StackingReport`** — mismo patrón de feedback que `CalibrationReport`: método usado, cantidad de frames, muestras rechazadas, señal media resultante, `toUserMessage()`.
+- Deliberadamente **sin** alineación/registro astronómico todavía (sección 14 del roadmap) — eso depende de detección de estrellas, que es V0.9. Por ahora asume que los frames ya están alineados píxel a píxel.
+- 7 tests, verificados de verdad en el sandbox (Kotlin puro, sin Android):
+```bash
+./scripts/verify-stacking-jvm.sh
+# -> OK (7 tests)
+```
+- Nuevo botón "Autotest de stacking" en el laboratorio de pruebas de `MainActivity`.
+
+## Siguiente paso
+
+Según el roadmap (V0.6): **Quality Analysis** — SNR, FWHM, conteo de estrellas, trailing, ranking de frames y rechazo automático. Esto típicamente iría *antes* de armar qué frames stackear (para descartar tomas malas), así que el orden real de uso del pipeline será: calibrar → analizar calidad → rechazar malos → stackear los buenos.
