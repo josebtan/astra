@@ -123,6 +123,17 @@ Los primeros tests de `DefectMapBuilder` **fallaron** con el enfoque media/stdde
 # -> OK (13 tests)
 ```
 
-## Siguiente paso
+## Añadido: laboratorio de pruebas real (no solo checklist de progreso)
 
-Con la calibración lista, el roadmap (V0.5) apunta a **Stacking** — combinar múltiples light frames ya calibrados en una sola imagen integrada (Mean, Median, Sigma Clip). Reutiliza directamente `MasterFrameBuilder`/lógica similar sobre frames ya calibrados en vez de crudos.
+El feedback fue justo: el roadmap nunca definió un diseño de UI, y una lista de progreso no deja *probar* nada. `MainActivity` ahora tiene, debajo del checklist, un botón por cada función ya implementada — cada uno corre el código real (no una simulación) y muestra el resultado real en una consola de salida en pantalla:
+
+- **Ver capacidades de cámara** — lista las cámaras del dispositivo y llama a `AndroidCameraDevice.getCapabilities()` de verdad.
+- **Capturar frame de prueba (1s, ISO 400)** — pide el permiso de cámara si falta, conecta, captura un DNG real, muestra ruta/tamaño/resolución. Si el sensor no reporta soporte RAW, lo dice explícitamente en vez de fallar en silencio.
+- **Decodificar último DNG capturado** — corre `DngTiffReader` sobre el archivo recién capturado y muestra dimensiones + estadísticas de los valores linealizados.
+- **Autotest de calibración** — corre `CalibrationEngine` con frames sintéticos (mismo patrón que los tests unitarios) y muestra el `CalibrationReport.toUserMessage()` completo.
+- **Crear sesión de prueba y releerla (Room)** — prueba la persistencia real: crea una `ObservationSession`, le agrega un frame (el capturado si existe, o uno sintético), y la vuelve a leer desde la base de datos en disco.
+- **Probar ajustes persistentes (DataStore)** — incrementa el ISO por defecto guardado y lo vuelve a leer; la instrucción en pantalla explica cómo comprobar que sobrevive a cerrar la app por completo, no solo minimizarla.
+
+Esto es honesto: sigue sin ser la UI final (el módulo `ui` del roadmap sigue pendiente, y el roadmap nunca especificó cómo debía verse), pero permite verificar de verdad, botón por botón, si cada pieza hace lo que se espera — que es exactamente lo que se pidió.
+
+**No verificable en este sandbox** (Activity + Room + DataStore + Camera2, todo Android real): se confirma con el build de GitHub Actions (compilación) y, para el comportamiento real, instalando el APK.

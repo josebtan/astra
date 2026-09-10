@@ -30,6 +30,13 @@ dependencies {
     implementation(project(":camera"))
     implementation(project(":raw"))
     implementation(project(":calibration"))
+
+    // Needed directly by MainActivity's test lab (Room.databaseBuilder,
+    // DataStoreSettingsRepository, runBlocking) - core/camera declare these
+    // as `implementation`, which doesn't leak transitively to app.
+    implementation("androidx.room:room-runtime:2.6.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
 }
 
 // `app` is intentionally minimal for V0.1: it only needs to exist so the
