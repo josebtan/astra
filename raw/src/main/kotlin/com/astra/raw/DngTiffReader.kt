@@ -11,6 +11,7 @@ private object TiffType {
     const val ASCII = 2
     const val SHORT = 3
     const val LONG = 4
+    const val RATIONAL = 5
 }
 
 private object DngTag {
@@ -46,6 +47,16 @@ private data class IfdEntry(
  * plain JVM (see DngTiffReaderTest, which hand-builds minimal DNG-shaped
  * files and round-trips them) — everything here is `java.io`/`java.nio`.
  *
+ * BlackLevel/WhiteLevel are read as numeric (Double), not plain Int:
+ * real-world DNGs (including the ones Android's own `DngCreator` writes)
+ * commonly store BlackLevel as a TIFF RATIONAL (numerator/denominator),
+ * not a LONG — an on-device report caught this ("Unsupported TIFF type 5
+ * for tag 50714") when the earlier Int-only version choked on it. If a
+ * tag has more than one value (e.g. a per-CFA-position BlackLevel array),
+ * only the first element is read; full per-channel black level handling
+ * is a future improvement, not needed yet since there's no debayering
+ * step to feed it into.
+ *
  * NOTE (performance, roadmap section 39): this loads the whole file into
  * memory at once. That's fine for a single frame; sessions with hundreds
  * of frames should process them one at a time rather than holding many
@@ -80,9 +91,9 @@ class DngTiffReader(private val file: File) {
         val stripOffset = entries.intValue(DngTag.STRIP_OFFSETS, buffer)
             ?: error("Missing required tag StripOffsets")
 
-        val blackLevel = entries.intValue(DngTag.BLACK_LEVEL, buffer) ?: 0
-        val whiteLevel = entries.intValue(DngTag.WHITE_LEVEL, buffer)
-            ?: ((1 shl bitsPerSample) - 1)
+        val blackLevel = entries.numericValue(DngTag.BLACK_LEVEL, buffer) ?: 0.0
+        val whiteLevel = entries.numericValue(DngTag.WHITE_LEVEL, buffer)
+            ?: ((1 shl bitsPerSample) - 1).toDouble()
         val range = whiteLevel - blackLevel
         check(range > 0) { "Invalid black/white level: black=$blackLevel white=$whiteLevel" }
 
@@ -96,8 +107,8 @@ class DngTiffReader(private val file: File) {
                 16 -> buffer.short.toInt() and 0xFFFF
                 else -> error("Unsupported BitsPerSample=$bitsPerSample")
             }
-            val clamped = (raw - blackLevel).coerceIn(0, range)
-            data[i] = clamped.toFloat() / range.toFloat()
+            val clamped = (raw - blackLevel).coerceIn(0.0, range)
+            data[i] = (clamped / range).toFloat()
         }
 
         return LinearImage(
@@ -146,6 +157,10 @@ class DngTiffReader(private val file: File) {
     private fun List<IfdEntry>.intValue(tag: Int, buffer: ByteBuffer): Int? =
         firstOrNull { it.tag == tag }?.let { resolveIntValue(it, buffer) }
 
+    /** Like [intValue], but also accepts RATIONAL tags (BlackLevel in real-world DNGs). */
+    private fun List<IfdEntry>.numericValue(tag: Int, buffer: ByteBuffer): Double? =
+        firstOrNull { it.tag == tag }?.let { resolveNumericValue(it, buffer) }
+
     private fun resolveIntValue(entry: IfdEntry, buffer: ByteBuffer): Int {
         val typeSizeBytes = when (entry.type) {
             TiffType.BYTE, TiffType.ASCII -> 1
@@ -163,4 +178,22 @@ class DngTiffReader(private val file: File) {
             else -> error("unreachable")
         }
     }
+
+    private fun resolveNumericValue(entry: IfdEntry, buffer: ByteBuffer): Double =
+        when (entry.type) {
+            TiffType.BYTE, TiffType.ASCII, TiffType.SHORT, TiffType.LONG ->
+                resolveIntValue(entry, buffer).toDouble()
+
+            TiffType.RATIONAL -> {
+                // 8 bytes per element (numerator LONG, denominator LONG),
+                // so it never fits inline - always stored via offset.
+                // Only the first element is read even if count > 1.
+                buffer.position(entry.rawFieldValue)
+                val numerator = buffer.int
+                val denominator = buffer.int
+                if (denominator == 0) 0.0 else numerator.toDouble() / denominator.toDouble()
+            }
+
+            else -> error("Unsupported TIFF type ${entry.type} for tag ${entry.tag}")
+        }
 }

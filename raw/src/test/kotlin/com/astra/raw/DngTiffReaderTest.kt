@@ -72,6 +72,88 @@ class DngTiffReaderTest {
         assertEquals(1.0f, image.data[1], 1e-6f)
     }
 
+    @Test
+    fun `reads BlackLevel stored as a RATIONAL tag, matching real-world DNG files`() {
+        // This is the exact bug reported from a real device: Android's own
+        // DngCreator writes BlackLevel (tag 50714) as a TIFF RATIONAL
+        // (numerator/denominator), not a LONG. The reader used to throw
+        // "Unsupported TIFF type 5 for tag 50714".
+        val file = buildDngWithRationalBlackLevel(
+            width = 2, height = 1,
+            blackLevelNumerator = 64, blackLevelDenominator = 1, // 64/1 = 64.0
+            whiteLevel = 1023,
+            rawPixels = intArrayOf(64, 800)
+        )
+
+        val image = DngTiffReader(file).readLinearImage()
+
+        assertEquals(0.0f, image.data[0], 1e-6f)                    // raw == blackLevel -> 0.0
+        assertEquals((800 - 64) / (1023.0f - 64f), image.data[1], 1e-6f)
+    }
+
+    /**
+     * Hand-builds a minimal DNG where BlackLevel is a RATIONAL (type 5, so
+     * it never fits inline in the 4-byte value field and always needs an
+     * "extra data" section, unlike every tag in [buildMinimalDng]).
+     * Layout: header -> IFD (9 entries) -> next-IFD-offset(0) ->
+     * BlackLevel's 8-byte rational -> pixel strip.
+     */
+    private fun buildDngWithRationalBlackLevel(
+        width: Int,
+        height: Int,
+        blackLevelNumerator: Int,
+        blackLevelDenominator: Int,
+        whiteLevel: Int,
+        rawPixels: IntArray
+    ): File {
+        val entryCount = 9
+        val firstEntryOffset = 10
+        val entryBlockSize = entryCount * 12
+        val nextIfdOffsetPos = firstEntryOffset + entryBlockSize
+        val rationalDataOffset = nextIfdOffsetPos + 4
+        val stripDataOffset = rationalDataOffset + 8
+
+        val totalSize = stripDataOffset + rawPixels.size * 2
+        val buffer = ByteBuffer.allocate(totalSize).order(ByteOrder.LITTLE_ENDIAN)
+
+        buffer.put(0x49.toByte()).put(0x49.toByte())
+        buffer.putShort(42)
+        buffer.putInt(8)
+
+        buffer.position(8)
+        buffer.putShort(entryCount.toShort())
+
+        fun writeInlineEntry(tag: Int, type: Int, value: Int) {
+            buffer.putShort(tag.toShort())
+            buffer.putShort(type.toShort())
+            buffer.putInt(1)
+            buffer.putInt(value)
+        }
+
+        writeInlineEntry(256, 4, width)                          // ImageWidth
+        writeInlineEntry(257, 4, height)                         // ImageLength
+        writeInlineEntry(258, 3, 16)                             // BitsPerSample
+        writeInlineEntry(259, 3, 1)                              // Compression
+        writeInlineEntry(277, 3, 1)                              // SamplesPerPixel
+        writeInlineEntry(273, 4, stripDataOffset)                // StripOffsets
+        writeInlineEntry(279, 4, rawPixels.size * 2)             // StripByteCounts
+        writeInlineEntry(50714, 5, rationalDataOffset)           // BlackLevel (RATIONAL, offset)
+        writeInlineEntry(50717, 4, whiteLevel)                   // WhiteLevel
+
+        buffer.putInt(0) // next IFD offset: none
+
+        buffer.position(rationalDataOffset)
+        buffer.putInt(blackLevelNumerator)
+        buffer.putInt(blackLevelDenominator)
+
+        buffer.position(stripDataOffset)
+        for (pixel in rawPixels) buffer.putShort(pixel.toShort())
+
+        val file = Files.createTempFile("astra-dng-rational-test", ".dng").toFile()
+        file.writeBytes(buffer.array())
+        return file
+    }
+
     /**
      * Hand-builds the smallest valid uncompressed TIFF/DNG this reader
      * supports: one IFD with every tag value fitting inline (count=1), a

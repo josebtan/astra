@@ -137,3 +137,25 @@ El feedback fue justo: el roadmap nunca definió un diseño de UI, y una lista d
 Esto es honesto: sigue sin ser la UI final (el módulo `ui` del roadmap sigue pendiente, y el roadmap nunca especificó cómo debía verse), pero permite verificar de verdad, botón por botón, si cada pieza hace lo que se espera — que es exactamente lo que se pidió.
 
 **No verificable en este sandbox** (Activity + Room + DataStore + Camera2, todo Android real): se confirma con el build de GitHub Actions (compilación) y, para el comportamiento real, instalando el APK.
+
+## Bug real encontrado probando en dispositivo: `DngTiffReader` no soportaba tipo RATIONAL
+
+Al probar "Decodificar último DNG" en un teléfono real: `IllegalStateException: Unsupported TIFF type 5 for tag 50714`.
+
+Causa: el `DngCreator` real de Android escribe `BlackLevel` (tag 50714) como TIFF **RATIONAL** (numerador/denominador), no como `LONG` — el parser solo soportaba BYTE/SHORT/LONG porque se diseñó y probó contra archivos sintéticos que solo cubrían esos tipos, no lo que Android realmente escribe. Es el tipo de error que la verificación con sintéticos no detecta si los sintéticos no reproducen el caso real — quedó confirmado en cuanto se probó contra hardware de verdad.
+
+Arreglado:
+- `blackLevel`/`whiteLevel` ahora son `Double`, no `Int` (RATIONAL puede no ser un entero exacto).
+- Soporte para tipo RATIONAL (8 bytes: numerador + denominador, siempre por offset ya que nunca cabe inline en el campo de 4 bytes).
+- Nuevo test que reproduce el caso exacto (`BlackLevel` como RATIONAL 64/1) — pasa.
+
+```bash
+./scripts/verify-raw-jvm.sh
+# -> OK (5 tests)
+```
+
+Sigue siendo un parser acotado (solo lee el primer elemento de un tag con count>1, sin patrón CFA todavía), pero ahora cubre el caso real que rompía en el teléfono.
+
+## Siguiente paso
+
+Seguir probando en el dispositivo real (captura, sesión, ajustes) y corrigiendo lo que aparezca, antes de avanzar a V0.5 (Stacking).
