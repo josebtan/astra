@@ -21,9 +21,11 @@ OUT="$(mktemp -d)"
 JARS="/usr/share/java/junit4.jar:/usr/share/java/hamcrest-core.jar:/usr/share/java/kotlinx-coroutines-core.jar:/usr/share/java/atomicfu.jar"
 KOTLIN_STDLIB="$(dirname "$(command -v "$KOTLINC")")/../lib/kotlin-stdlib.jar"
 
+MODEL_SOURCES=$(find "$ROOT"/core/src/main/kotlin/com/astra/core/model -name "*.kt" ! -name "CameraDevice.kt")
+
 echo "== Compiling main sources =="
 "$KOTLINC" -cp "$JARS" \
-  "$ROOT"/core/src/main/kotlin/com/astra/core/model/*.kt \
+  $MODEL_SOURCES \
   "$ROOT"/core/src/main/kotlin/com/astra/core/storage/SessionFileStore.kt \
   "$ROOT"/core/src/main/kotlin/com/astra/core/storage/settings/UserSettings.kt \
   "$ROOT"/core/src/main/kotlin/com/astra/core/storage/settings/SettingsRepository.kt \

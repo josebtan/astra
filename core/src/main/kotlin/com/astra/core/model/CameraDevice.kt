@@ -1,5 +1,7 @@
 package com.astra.core.model
 
+import android.view.Surface
+
 /**
  * Common abstraction over every image source ASTRA can capture from:
  * internal phone camera, USB camera, dedicated astro camera, DSLR/mirrorless.
@@ -19,7 +21,8 @@ interface CameraDevice {
 
     fun disconnect()
 
-    fun startPreview()
+    /** Starts a live preview rendered into [surface] (e.g. from a SurfaceView in the UI). */
+    fun startPreview(surface: Surface)
 
     fun stopPreview()
 

@@ -15,6 +15,10 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".CaptureActivity"
+            android:exported="false" />
+
         <!-- The real capture screen replaces MainActivity once the `ui`
              module exists (roadmap section 37). -->
     </application>

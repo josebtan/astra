@@ -176,3 +176,22 @@ Seguir probando en el dispositivo real (captura, sesión, ajustes) y corrigiendo
 ## Siguiente paso
 
 Según el roadmap (V0.6): **Quality Analysis** — SNR, FWHM, conteo de estrellas, trailing, ranking de frames y rechazo automático. Esto típicamente iría *antes* de armar qué frames stackear (para descartar tomas malas), así que el orden real de uso del pipeline será: calibrar → analizar calidad → rechazar malos → stackear los buenos.
+
+## Nota sobre commits directos al repo
+
+Hubo un intento de avanzar directamente sobre el repositorio en GitHub que rompió la compilación (10 commits agregando módulos `quality`/`registration` a medio terminar). Se descartaron por completo (reset + force-push al último commit sano, V0.5 Stacking) para retomar desde ahí. Si vas a experimentar directo en el repo, avísame antes para coordinar y no perder trabajo en ninguno de los dos lados.
+
+## Añadido: cámara e interfaz reales funcionando (no más autotest sintético)
+
+Petición explícita: dejar de probar con datos sintéticos y poner a funcionar la cámara y la interfaz de verdad.
+
+- **`CameraDevice.startPreview(surface: Surface)`** — la interfaz ahora recibe un `Surface` real en vez de no hacer nada. Es el único archivo de `core/model` que ya no es Android-free a propósito (necesita `android.view.Surface`); los scripts de verificación local lo excluyen explícitamente y lo documentan.
+- **`AndroidCameraDevice`** — implementación real de preview: `startPreview()` crea una sesión de captura repetitiva contra el `Surface`; `stopPreview()` la detiene. Como Camera2 solo permite una sesión activa a la vez, `capture()` cierra el preview antes de capturar y no lo reanuda automáticamente (documentado en el KDoc) — la UI es responsable de reiniciarlo.
+- **`CaptureActivity`** (nueva pantalla) — vista previa en vivo con `SurfaceView`, campos de exposición/ISO, selector de tipo de frame (LIGHT/DARK/BIAS/FLAT), y:
+  - **Capturar** — captura real, decodifica el DNG resultante con `DngTiffReader`, lo guarda en la lista correspondiente, reanuda el preview.
+  - **Procesar sesión** — corre `CalibrationEngine` sobre cada LIGHT capturado usando los BIAS/DARK/FLAT reales capturados en la sesión (no sintéticos), y luego `StackingEngine` sobre los resultados calibrados. Muestra el reporte completo.
+  - **Guardar sesión** — persiste todo en Room de verdad.
+  - **Limpiar frames** — reinicia el estado en memoria para volver a intentar.
+- `MainActivity` ahora tiene un botón "Abrir pantalla de captura en vivo" que lanza `CaptureActivity`. El laboratorio de pruebas con datos sintéticos se queda como está (sigue siendo útil para aislar problemas de una función específica), pero ya no es el único camino.
+
+**No verificable en este sandbox** (Camera2 real, `SurfaceView`, sesiones concurrentes) — se confirma con el build de CI y, para el comportamiento real de la cámara, en el dispositivo.

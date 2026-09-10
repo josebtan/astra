@@ -17,6 +17,7 @@ import android.media.ImageReader
 import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
+import android.view.Surface
 import androidx.core.content.ContextCompat
 import com.astra.core.model.CameraCapabilities
 import com.astra.core.model.CameraConnectionState
@@ -46,12 +47,16 @@ import java.util.concurrent.TimeUnit
  * internally this blocks the calling thread on a [Semaphore] until the RAW
  * image and its capture metadata are both available and written to disk.
  * **Call from a background thread** (e.g. `Dispatchers.IO`), never from the
- * main/UI thread.
+ * main/UI thread. The same is true of [startPreview].
  *
- * NOTE: [startPreview]/[stopPreview] are not implemented yet. Camera2
- * preview needs a `Surface` supplied by the UI layer, and there is no `ui`
- * module yet — wiring this up is part of building the capture screen, not
- * part of the V0.1/V0.2 data-and-capture milestone (roadmap section 42).
+ * Camera2 only allows one active [CameraCaptureSession] per device, so
+ * [session] is shared between live preview and one-shot capture: calling
+ * [capture] while a preview is running closes the preview session first,
+ * does the capture, and leaves preview stopped — **the caller must call
+ * [startPreview] again** afterward to resume live view. This keeps the
+ * session lifecycle simple (no concurrent multi-surface sessions yet)
+ * at the cost of a visible preview freeze during each exposure, which is
+ * expected anyway for long astrophotography exposures.
  *
  * NOT VERIFIABLE ON THE PLAIN JVM: this class needs a real Camera2 HAL
  * (an actual device or emulator with camera support). The parts of the
@@ -73,7 +78,7 @@ class AndroidCameraDevice(
         cameraManager.getCameraCharacteristics(cameraId)
 
     private var device: Camera2Device? = null
-    private var captureSession: CameraCaptureSession? = null
+    private var session: CameraCaptureSession? = null
     private var backgroundThread: HandlerThread? = null
     private var backgroundHandler: Handler? = null
 
@@ -81,6 +86,7 @@ class AndroidCameraDevice(
     @Volatile private var lastError: String? = null
     @Volatile private var framesCapturedInSequence: Int = 0
     @Volatile private var sequenceActive = false
+    @Volatile private var isPreviewing = false
 
     override fun getCapabilities(): CameraCapabilities = mapToCapabilities(readSensorSpec())
 
@@ -130,22 +136,48 @@ class AndroidCameraDevice(
     }
 
     override fun disconnect() {
-        captureSession?.close()
-        captureSession = null
+        closeActiveSession()
         device?.close()
         device = null
         connectionState = CameraConnectionState.DISCONNECTED
         stopBackgroundThread()
     }
 
-    override fun startPreview() {
-        throw UnsupportedOperationException(
-            "Preview needs a Surface from the UI layer, which doesn't exist yet."
+    override fun startPreview(surface: Surface) {
+        val cameraDevice = device ?: error("Camera not connected - call connect() first")
+        closeActiveSession()
+
+        val sessionLatch = Semaphore(0)
+        cameraDevice.createCaptureSession(
+            listOf(surface),
+            object : CameraCaptureSession.StateCallback() {
+                override fun onConfigured(configuredSession: CameraCaptureSession) {
+                    session = configuredSession
+                    sessionLatch.release()
+                }
+
+                override fun onConfigureFailed(configuredSession: CameraCaptureSession) {
+                    lastError = "Failed to configure preview session"
+                    sessionLatch.release()
+                }
+            },
+            backgroundHandler
         )
+        if (!sessionLatch.tryAcquire(10, TimeUnit.SECONDS) || session == null) {
+            error(lastError ?: "Timed out configuring preview session")
+        }
+
+        val requestBuilder = cameraDevice.createCaptureRequest(Camera2Device.TEMPLATE_PREVIEW).apply {
+            addTarget(surface)
+        }
+        session?.setRepeatingRequest(requestBuilder.build(), null, backgroundHandler)
+        isPreviewing = true
     }
 
     override fun stopPreview() {
-        // No-op until startPreview() is implemented against a real Surface.
+        if (!isPreviewing) return
+        closeActiveSession()
+        isPreviewing = false
     }
 
     override fun capture(settings: CaptureSettings): ImageFrame {
@@ -153,6 +185,12 @@ class AndroidCameraDevice(
         check(settings.rawFormat == RawFormat.DNG) {
             "AndroidCameraDevice currently only supports RawFormat.DNG"
         }
+
+        // Camera2 allows only one active session; drop the preview (if any)
+        // before configuring the capture session. Caller must restart
+        // preview afterward if desired - see class KDoc.
+        closeActiveSession()
+        isPreviewing = false
 
         val spec = readSensorSpec()
         val imageReader = ImageReader.newInstance(
@@ -183,19 +221,19 @@ class AndroidCameraDevice(
         cameraDevice.createCaptureSession(
             listOf(imageReader.surface),
             object : CameraCaptureSession.StateCallback() {
-                override fun onConfigured(session: CameraCaptureSession) {
-                    captureSession = session
+                override fun onConfigured(configuredSession: CameraCaptureSession) {
+                    session = configuredSession
                     sessionLatch.release()
                 }
 
-                override fun onConfigureFailed(session: CameraCaptureSession) {
+                override fun onConfigureFailed(configuredSession: CameraCaptureSession) {
                     lastError = "Failed to configure capture session"
                     sessionLatch.release()
                 }
             },
             backgroundHandler
         )
-        if (!sessionLatch.tryAcquire(10, TimeUnit.SECONDS) || captureSession == null) {
+        if (!sessionLatch.tryAcquire(10, TimeUnit.SECONDS) || session == null) {
             imageReader.close()
             error(lastError ?: "Timed out configuring capture session")
         }
@@ -207,11 +245,11 @@ class AndroidCameraDevice(
             settings.iso?.let { set(CaptureRequest.SENSOR_SENSITIVITY, it) }
         }
 
-        captureSession?.capture(
+        session?.capture(
             requestBuilder.build(),
             object : CameraCaptureSession.CaptureCallback() {
                 override fun onCaptureCompleted(
-                    session: CameraCaptureSession,
+                    activeSession: CameraCaptureSession,
                     request: CaptureRequest,
                     result: TotalCaptureResult
                 ) {
@@ -220,7 +258,7 @@ class AndroidCameraDevice(
                 }
 
                 override fun onCaptureFailed(
-                    session: CameraCaptureSession,
+                    activeSession: CameraCaptureSession,
                     request: CaptureRequest,
                     failure: CaptureFailure
                 ) {
@@ -266,6 +304,16 @@ class AndroidCameraDevice(
         framesCapturedInSequence = framesCapturedInSequence,
         lastErrorMessage = lastError
     )
+
+    private fun closeActiveSession() {
+        try {
+            session?.stopRepeating()
+        } catch (e: Exception) {
+            // session may already be invalid (e.g. camera disconnected) - safe to ignore, we're closing it anyway
+        }
+        session?.close()
+        session = null
+    }
 
     private fun writeDngAndBuildFrame(
         image: Image,

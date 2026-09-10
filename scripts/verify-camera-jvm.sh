@@ -13,9 +13,11 @@ OUT="$(mktemp -d)"
 JARS="/usr/share/java/junit4.jar:/usr/share/java/hamcrest-core.jar"
 KOTLIN_STDLIB="$(dirname "$(command -v "$KOTLINC")")/../lib/kotlin-stdlib.jar"
 
+MODEL_SOURCES=$(find "$ROOT"/core/src/main/kotlin/com/astra/core/model -name "*.kt" ! -name "CameraDevice.kt")
+
 echo "== Compiling main sources (core/model + camera mapper) =="
 "$KOTLINC" -cp "$JARS" \
-  "$ROOT"/core/src/main/kotlin/com/astra/core/model/*.kt \
+  $MODEL_SOURCES \
   "$ROOT"/camera/src/main/kotlin/com/astra/camera/android/CameraCharacteristicsMapper.kt \
   -d "$OUT/main"
 

@@ -2,6 +2,7 @@ package com.astra.app
 
 import android.Manifest
 import android.app.Activity
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Typeface
@@ -141,6 +142,20 @@ class MainActivity : Activity() {
 
         root.addView(sectionTitle("Progreso del roadmap", textColor))
         milestones().forEach { root.addView(milestoneRow(it, textColor)) }
+
+        root.addView(sectionTitle("Captura real", textColor).apply {
+            setPadding(0, dp(28), 0, dp(8))
+        })
+        root.addView(TextView(this).apply {
+            text = "Vista previa en vivo, captura real de LIGHT/DARK/BIAS/FLAT, y el pipeline de " +
+                "calibración + stacking corriendo sobre esos frames reales."
+            setTextColor(mutedColor)
+            textSize = 12f
+            setPadding(0, 0, 0, dp(8))
+        })
+        root.addView(labButton("Abrir pantalla de captura en vivo") {
+            startActivity(Intent(this, CaptureActivity::class.java))
+        })
 
         root.addView(sectionTitle("Laboratorio de pruebas", textColor).apply {
             setPadding(0, dp(28), 0, dp(8))
