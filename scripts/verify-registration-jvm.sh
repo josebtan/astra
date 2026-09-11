@@ -27,6 +27,8 @@ echo "== Compiling tests =="
 echo "== Running tests =="
 java -cp "$OUT/main:$OUT/test:$JARS:$KOTLIN_STDLIB" org.junit.runner.JUnitCore \
   com.astra.registration.TranslationAlignerTest \
-  com.astra.registration.RegistrationEngineTest
+  com.astra.registration.RegistrationEngineTest \
+  com.astra.registration.ImageTransformerTest \
+  com.astra.registration.SimilarityEstimatorTest
 
 rm -rf "$OUT"

@@ -6,8 +6,12 @@
         android:theme="@style/Theme.Astra"
         android:allowBackup="true">
 
+        <!-- CaptureActivity is the real interface and now the launcher.
+             MainActivity (roadmap progress + synthetic-data test lab)
+             stays as a secondary debug screen, reachable from within
+             CaptureActivity, not the primary flow anymore. -->
         <activity
-            android:name=".MainActivity"
+            android:name=".CaptureActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -16,10 +20,7 @@
         </activity>
 
         <activity
-            android:name=".CaptureActivity"
+            android:name=".MainActivity"
             android:exported="false" />
-
-        <!-- The real capture screen replaces MainActivity once the `ui`
-             module exists (roadmap section 37). -->
     </application>
 </manifest>

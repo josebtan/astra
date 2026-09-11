@@ -214,3 +214,32 @@ Adelantado a pedido explícito, antes de llegar a detección de estrellas (V0.9)
 ## Siguiente paso
 
 Seguir probando el pipeline completo (captura → calibración → alineación → stacking) en el dispositivo real con tomas con algo de temblor de mano intencional, para confirmar que la alineación corrige algo visible.
+
+## Cambio de navegación: la interfaz real ya no es el laboratorio de pruebas
+
+Petición explícita: dejar de trabajar sobre `MainActivity` (laboratorio con datos sintéticos) y que la interfaz real sea la principal.
+
+- **`CaptureActivity` es ahora el launcher** de la app (movido el `intent-filter` en el manifest).
+- **`MainActivity`** queda como pantalla secundaria de debug (progreso del roadmap + laboratorio sintético), accesible desde un botón dentro de `CaptureActivity` — ya no es el punto de entrada ni el foco de desarrollo.
+
+## Añadido: rotación y escala en la alineación (`registration`)
+
+Sugerencia del usuario, implementada como capacidad adicional (no reemplaza la traslación simple por defecto, que es más rápida y suficiente para el caso común de temblor de mano):
+
+- **`ImageTransformer`** — rota y escala una imagen alrededor de su propio centro (muestreo por vecino más cercano, igual que el resto de esta capa — sin interpolación).
+- **`SimilarityEstimator`** — búsqueda por fuerza bruta sobre una grilla de ángulos y escalas candidatos; para cada combinación, resamplea el target y reutiliza la búsqueda de traslación de `TranslationAligner` para encontrar el mejor desplazamiento. Es más lento que solo traslación (aprox. `pasos_rotación × pasos_escala` veces), por diseño — es una opción, no el camino por defecto.
+- **`RegistrationEngine.registerWithRotationAndScale()`** — misma idea que `register()` pero usando el estimador completo, con el mismo reporte de feedback (ahora incluye rotación/escala cuando no son la identidad).
+- En `CaptureActivity`: checkbox "Corregir también rotación/escala al alinear (más lento)" — desmarcado por defecto.
+
+## Notas de verificación (encontré 3 bugs reales escribiendo esto)
+
+1. **Centro geométrico entre píxeles**: mis primeros tests de `ImageTransformer` usaban una imagen de ancho impar (21), cuyo centro cae en 10.5 — entre dos píxeles, no en uno exacto. Reescritos con dimensiones pares (20) para que el centro sea un píxel real.
+2. **Ambigüedad genuina con bloques sólidos**: un bloque cuadrado sólido rotado 1-2° puede dar exactamente el mismo error (SSD) que sin rotar, bajo muestreo por vecino más cercano — el algoritmo elige la primera candidata empatada, no necesariamente la "correcta". No es un bug de lógica, es una propiedad del patrón de prueba. Ajustado el test para verificar el resultado final (¿la imagen quedó realineada?) en vez del parámetro interno exacto.
+3. **Rotación demasiado cerca del centro**: un bloque a 2-3px del centro de rotación, rotado 3°, se mueve menos de un píxel de arco — el muestreo por vecino más cercano no detecta ningún cambio. Corregido alejando el bloque de prueba del centro.
+
+```bash
+./scripts/verify-registration-jvm.sh
+# -> OK (17 tests)
+```
+
+Total: 61 tests verificados de verdad en el sandbox, en los 6 módulos independientes de Android.

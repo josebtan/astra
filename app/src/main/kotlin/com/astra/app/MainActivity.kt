@@ -42,14 +42,14 @@ import java.time.Instant
 import java.util.UUID
 
 /**
- * Temporary screen, **not** the real UI module (roadmap section 37 still
- * has `ui/` as a future module, and the roadmap never specifies a visual
- * design for it - there isn't one to follow yet).
- *
- * Two things live here on purpose:
+ * **Secondary/debug screen** — [CaptureActivity] is now the real interface
+ * and the app's launcher. This one stays for two things that don't belong
+ * in the real flow:
  * 1. A roadmap-progress checklist (what's done/in progress/pending).
- * 2. A "test lab": one button per already-implemented feature (camera
- *    capabilities, RAW capture, DNG decoding, automatic calibration,
+ * 2. A "test lab": one button per already-implemented feature, each using
+ *    small synthetic data instead of a real capture — useful for isolating
+ *    whether a single function behaves correctly without needing to go
+ *    through a full real capture first.
  *    session persistence, settings persistence), each running the real
  *    code and printing the real result - so functionality can actually be
  *    exercised and checked against expectations before there's a proper

@@ -5,6 +5,9 @@ import com.astra.core.model.LinearImage
 /** [dx]/[dy]: how much [confidence] between 0 (couldn't tell) and 1 (clear match). */
 data class ShiftEstimate(val dx: Int, val dy: Int, val confidence: Double)
 
+/** Internal result of the raw translation search, before confidence is derived from it. */
+internal data class ShiftSearchResult(val dx: Int, val dy: Int, val bestSsd: Double, val meanSsd: Double)
+
 /**
  * Estimates and corrects **translation-only** misalignment between two
  * frames — no rotation, no scale. This is a deliberately simplified
@@ -13,7 +16,8 @@ data class ShiftEstimate(val dx: Int, val dy: Int, val confidence: Double)
  * star detection that doesn't exist yet (V0.9 Object Detection). It
  * handles the common case of hand-shake-level misalignment between shots
  * of the same target; it does not handle field rotation from long
- * exposures or any real lens distortion.
+ * exposures or any real lens distortion — for that, see [SimilarityEstimator],
+ * which layers rotation/scale search on top of this same translation search.
  *
  * Method: brute-force search over candidate (dx, dy) shifts within
  * [±maxShift], picking the one with the lowest sum-of-squared-differences
@@ -28,6 +32,30 @@ object TranslationAligner {
         maxShift: Int = 20,
         sampleStride: Int = 1
     ): ShiftEstimate {
+        val search = search(reference, target, maxShift, sampleStride)
+        val confidence = confidenceFrom(search.bestSsd, search.meanSsd)
+        return ShiftEstimate(search.dx, search.dy, confidence)
+    }
+
+    /**
+     * Confidence compares the best candidate to the *average* candidate,
+     * not just to zero-shift: a sharp, distinct minimum among many worse
+     * candidates means "clearly this shift, not another" (high
+     * confidence). A flat/featureless frame gives every candidate a
+     * similar score, so the best one isn't meaningfully better than
+     * average (low confidence) - that matters more than a fixed
+     * threshold, since it also naturally handles frames with too little
+     * signal to align against.
+     */
+    internal fun confidenceFrom(bestSsd: Double, meanSsd: Double): Double =
+        if (meanSsd > 0.0) ((meanSsd - bestSsd) / meanSsd).coerceIn(0.0, 1.0) else 0.0
+
+    internal fun search(
+        reference: LinearImage,
+        target: LinearImage,
+        maxShift: Int,
+        sampleStride: Int
+    ): ShiftSearchResult {
         require(reference.width == target.width && reference.height == target.height) {
             "Reference and target must have the same dimensions"
         }
@@ -53,22 +81,8 @@ object TranslationAligner {
             }
         }
 
-        // Confidence compares the best candidate to the *average* candidate,
-        // not just to zero-shift: a sharp, distinct minimum among many worse
-        // candidates means "clearly this shift, not another" (high
-        // confidence). A flat/featureless frame gives every candidate a
-        // similar score, so the best one isn't meaningfully better than
-        // average (low confidence) - that matters more than a fixed
-        // threshold, since it also naturally handles frames with too little
-        // signal to align against.
         val meanSsd = if (candidateCount > 0) sumSsd / candidateCount else 0.0
-        val confidence = if (meanSsd > 0.0) {
-            ((meanSsd - bestSsd) / meanSsd).coerceIn(0.0, 1.0)
-        } else {
-            0.0 // perfectly flat everywhere - no feature to align against
-        }
-
-        return ShiftEstimate(bestDx, bestDy, confidence)
+        return ShiftSearchResult(bestDx, bestDy, bestSsd, meanSsd)
     }
 
     /**

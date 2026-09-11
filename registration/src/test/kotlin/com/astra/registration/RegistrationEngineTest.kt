@@ -62,6 +62,28 @@ class RegistrationEngineTest {
         assertTrue(message.contains("Frame 1"))
     }
 
+    @Test
+    fun `registerWithRotationAndScale corrects a rotated frame and reports the angle`() {
+        // Block placed well away from the rotation center (image center,
+        // 15,15) so a 3-degree rotation actually crosses pixel-rounding
+        // boundaries - too close to center and the arc length is smaller
+        // than a pixel, so nearest-neighbor resampling wouldn't move
+        // anything at all (found via a failing run of this exact test).
+        val reference = blockImage(30, 30, 22, 5)
+        val rotatedTarget = ImageTransformer.rotateAndScale(reference, rotationDegrees = 3.0, scale = 1.0)
+
+        val result = RegistrationEngine.registerWithRotationAndScale(
+            listOf(reference, rotatedTarget),
+            maxShift = 4, sampleStride = 1,
+            rotationRangeDegrees = 5.0, rotationStepDegrees = 1.0,
+            scaleRange = 0.0, scaleStep = 1.0
+        )
+
+        assertTrue(result.report.steps[1].aligned)
+        val message = result.report.toUserMessage()
+        assertTrue(message.contains("rotation="))
+    }
+
     private fun blockImage(width: Int, height: Int, blockX: Int, blockY: Int): LinearImage {
         val data = FloatArray(width * height)
         for (y in blockY until (blockY + 4).coerceAtMost(height)) {

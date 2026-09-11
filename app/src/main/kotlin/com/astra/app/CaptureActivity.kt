@@ -2,6 +2,7 @@ package com.astra.app
 
 import android.Manifest
 import android.app.Activity
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.graphics.Typeface
@@ -13,6 +14,7 @@ import android.view.SurfaceView
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -74,6 +76,7 @@ class CaptureActivity : Activity() {
     private lateinit var exposureInput: EditText
     private lateinit var isoInput: EditText
     private lateinit var frameTypeSpinner: Spinner
+    private lateinit var rotationScaleCheckbox: CheckBox
     private lateinit var countsView: TextView
     private lateinit var outputView: TextView
     private val outputBuilder = StringBuilder()
@@ -163,9 +166,16 @@ class CaptureActivity : Activity() {
             text = frameCountsText()
             setTextColor(textColor)
             textSize = 13f
-            setPadding(0, dp(12), 0, dp(12))
+            setPadding(0, dp(12), 0, dp(4))
         }
         controls.addView(countsView)
+
+        rotationScaleCheckbox = CheckBox(this).apply {
+            text = "Corregir también rotación/escala al alinear (más lento)"
+            setTextColor(mutedColor)
+            textSize = 12f
+        }
+        controls.addView(rotationScaleCheckbox)
 
         controls.addView(labButton("Capturar") { onCaptureButtonPressed() })
         controls.addView(labButton("Reintentar preview") { onRetryPreviewPressed() })
@@ -176,6 +186,9 @@ class CaptureActivity : Activity() {
             runInBackground("Guardar sesión") { saveSessionReport() }
         })
         controls.addView(labButton("Limpiar frames capturados") { clearCapturedFrames() })
+        controls.addView(labButton("Progreso del roadmap / laboratorio (debug)") {
+            startActivity(Intent(this, MainActivity::class.java))
+        })
 
         controls.addView(TextView(this).apply {
             text = "Salida"
@@ -362,7 +375,11 @@ class CaptureActivity : Activity() {
             lastCalibrationReport = calibration.report
         }
 
-        val registrationResult = RegistrationEngine.register(calibratedLights)
+        val registrationResult = if (rotationScaleCheckbox.isChecked) {
+            RegistrationEngine.registerWithRotationAndScale(calibratedLights)
+        } else {
+            RegistrationEngine.register(calibratedLights)
+        }
         val stackResult = StackingEngine.stack(registrationResult.alignedFrames, StackingMethod.SIGMA_CLIP)
 
         return buildString {
