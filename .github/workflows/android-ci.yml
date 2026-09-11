@@ -28,8 +28,8 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Run unit tests (core + camera + raw + calibration + stacking)
-        run: ./gradlew :core:testDebugUnitTest :camera:testDebugUnitTest :raw:testDebugUnitTest :calibration:testDebugUnitTest :stacking:testDebugUnitTest --stacktrace
+      - name: Run unit tests (core + camera + raw + calibration + stacking + registration)
+        run: ./gradlew :core:testDebugUnitTest :camera:testDebugUnitTest :raw:testDebugUnitTest :calibration:testDebugUnitTest :stacking:testDebugUnitTest :registration:testDebugUnitTest --stacktrace
 
       - name: Assemble debug APK
         run: ./gradlew :app:assembleDebug --stacktrace
@@ -45,6 +45,7 @@ jobs:
             raw/build/reports/tests/testDebugUnitTest
             calibration/build/reports/tests/testDebugUnitTest
             stacking/build/reports/tests/testDebugUnitTest
+            registration/build/reports/tests/testDebugUnitTest
           if-no-files-found: ignore
 
       - name: Upload debug APK

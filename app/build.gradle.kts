@@ -31,6 +31,7 @@ dependencies {
     implementation(project(":raw"))
     implementation(project(":calibration"))
     implementation(project(":stacking"))
+    implementation(project(":registration"))
 
     // Needed directly by MainActivity's test lab (Room.databaseBuilder,
     // DataStoreSettingsRepository, runBlocking) - core/camera declare these

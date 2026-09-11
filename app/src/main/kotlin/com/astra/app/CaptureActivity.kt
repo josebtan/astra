@@ -32,6 +32,7 @@ import com.astra.core.storage.SessionFileStore
 import com.astra.core.storage.db.AstraDatabase
 import com.astra.core.storage.db.RoomSessionRepository
 import com.astra.raw.DngTiffReader
+import com.astra.registration.RegistrationEngine
 import com.astra.stacking.StackingEngine
 import com.astra.stacking.StackingMethod
 import kotlinx.coroutines.runBlocking
@@ -168,7 +169,7 @@ class CaptureActivity : Activity() {
 
         controls.addView(labButton("Capturar") { onCaptureButtonPressed() })
         controls.addView(labButton("Reintentar preview") { onRetryPreviewPressed() })
-        controls.addView(labButton("Procesar sesión (calibrar + stack)") {
+        controls.addView(labButton("Procesar sesión (calibrar + alinear + stack)") {
             runInBackground("Procesar sesión") { processSessionReport() }
         })
         controls.addView(labButton("Guardar sesión (Room)") {
@@ -361,13 +362,16 @@ class CaptureActivity : Activity() {
             lastCalibrationReport = calibration.report
         }
 
-        val stackResult = StackingEngine.stack(calibratedLights, StackingMethod.SIGMA_CLIP)
+        val registrationResult = RegistrationEngine.register(calibratedLights)
+        val stackResult = StackingEngine.stack(registrationResult.alignedFrames, StackingMethod.SIGMA_CLIP)
 
         return buildString {
             appendLine("Frames LIGHT procesados: ${lightImages.size} (con ${biasImages.size} bias, ${darkImages.size} dark, ${flatImages.size} flat disponibles)")
             appendLine()
             appendLine("Calibración (reporte del último LIGHT procesado):")
             append(lastCalibrationReport?.toUserMessage() ?: "N/A")
+            appendLine()
+            append(registrationResult.report.toUserMessage())
             appendLine()
             append(stackResult.report.toUserMessage())
             appendLine("Imagen final: ${stackResult.stackedImage.width}x${stackResult.stackedImage.height}")

@@ -195,3 +195,22 @@ Petición explícita: dejar de probar con datos sintéticos y poner a funcionar 
 - `MainActivity` ahora tiene un botón "Abrir pantalla de captura en vivo" que lanza `CaptureActivity`. El laboratorio de pruebas con datos sintéticos se queda como está (sigue siendo útil para aislar problemas de una función específica), pero ya no es el único camino.
 
 **No verificable en este sandbox** (Camera2 real, `SurfaceView`, sesiones concurrentes) — se confirma con el build de CI y, para el comportamiento real de la cámara, en el dispositivo.
+
+## Añadido: alineación básica (`registration` module)
+
+Adelantado a pedido explícito, antes de llegar a detección de estrellas (V0.9): el stacking asumía frames ya alineados y no lo estaba verificando. Ahora hay un paso intermedio.
+
+- **`TranslationAligner`** — estima desplazamiento (dx, dy) entre dos frames por búsqueda de correlación cruzada espacial (fuerza bruta sobre candidatos dentro de `±maxShift`, minimizando la suma de diferencias al cuadrado). Solo traslación — nada de rotación ni escala, eso sigue dependiendo de detección de estrellas real (roadmap sección 14, V0.9).
+- **Confianza automática** — no compara contra un umbral fijo, compara el mejor candidato contra el promedio de todos los candidatos probados. Un pico de correlación claro y distinto → confianza alta; una imagen plana sin features donde todos los desplazamientos dan more o menos lo mismo → confianza baja (cero, en el caso extremo).
+- **`RegistrationEngine`** — alinea una lista de frames respecto al primero. Si la confianza de un frame es demasiado baja, **no lo fuerza** con un desplazamiento probablemente equivocado — lo deja tal cual y lo marca en el reporte, mismo patrón de feedback que calibración/stacking.
+- Conectado al pipeline real de `CaptureActivity`: ahora es calibrar → **alinear** → stackear, en ese orden.
+- 9 tests, verificados de verdad en el sandbox con un patrón sintético (bloque brillante desplazado en cantidad conocida):
+```bash
+./scripts/verify-registration-jvm.sh
+# -> OK (9 tests)
+```
+(De hecho encontró un bug real en mi propio test al escribirlo — un helper de prueba generaba un bloque de 3×3 en vez de 4×4 — corregido antes de dar el paso por bueno.)
+
+## Siguiente paso
+
+Seguir probando el pipeline completo (captura → calibración → alineación → stacking) en el dispositivo real con tomas con algo de temblor de mano intencional, para confirmar que la alineación corrige algo visible.

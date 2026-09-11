@@ -148,7 +148,7 @@ class MainActivity : Activity() {
         })
         root.addView(TextView(this).apply {
             text = "Vista previa en vivo, captura real de LIGHT/DARK/BIAS/FLAT, y el pipeline de " +
-                "calibración + stacking corriendo sobre esos frames reales."
+                "calibración + alineación + stacking corriendo sobre esos frames reales."
             setTextColor(mutedColor)
             textSize = 12f
             setPadding(0, 0, 0, dp(8))
