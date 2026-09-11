@@ -251,7 +251,7 @@ class MainActivity : Activity() {
         Milestone("V0.3 RAW Engine — decodificación DNG a LinearImage", Status.DONE),
         Milestone("V0.4 Calibration — bias/dark/flat + corrección de defectos", Status.DONE),
         Milestone("V0.5 Stacking — Mean/Median/Sigma Clip", Status.DONE),
-        Milestone("V0.6 Quality Analysis", Status.PENDING),
+        Milestone("V0.6 Quality Analysis — SNR/FWHM/rechazo automático", Status.DONE),
         Milestone("V0.7 Astrometry", Status.PENDING),
         Milestone("V0.8 Astronomy Engine", Status.PENDING),
         Milestone("V0.9 Object Detection", Status.PENDING),

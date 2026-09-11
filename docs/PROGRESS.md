@@ -243,3 +243,24 @@ Sugerencia del usuario, implementada como capacidad adicional (no reemplaza la t
 ```
 
 Total: 61 tests verificados de verdad en el sandbox, en los 6 módulos independientes de Android.
+
+## Añadido: V0.6 — Quality Analysis (`quality` module)
+
+Sin detección de estrellas real todavía (roadmap sección 18, V0.9), así que uso un detector de picos simple (máximos locales por umbral) como sustituto liviano — suficiente para puntuar calidad, no para astrometría.
+
+- **`BackgroundEstimator`** — nivel de fondo y ruido por mediana/MAD (mismo principio robusto que en calibración).
+- **`PeakDetector`** — máximos locales por encima de fondo+k·ruido, con supresión de no-máximos para no contar la misma estrella dos veces. Incluye un "FWHM proxy" (ancho a media altura, escaneado en cruz — no es un ajuste gaussiano real).
+- **`FrameQualityAnalyzer`** — combina conteo de estrellas, SNR, fracción de saturación, y FWHM promedio en un score 0-100, con razones explícitas de rechazo cuando corresponde (pocas estrellas, SNR bajo, saturación, o estrellas demasiado anchas — posible trailing/desenfoque).
+- **`FrameRanker`** — ordena y separa automáticamente frames aceptados/rechazados de un lote.
+- Conectado al pipeline real: "Procesar sesión" ahora es **calidad → calibrar → alinear → stackear** — los LIGHT que no pasan el control automático de calidad ni siquiera llegan a calibración.
+- 12 tests, verificados de verdad en el sandbox:
+```bash
+./scripts/verify-quality-jvm.sh
+# -> OK (12 tests)
+```
+
+Total: **73 tests** reales en los 7 módulos independientes de Android.
+
+## Siguiente paso
+
+Roadmap V0.7 — Astrometry: plate solving, RA/DEC, escala de píxel, orientación. Esto es harina de otro costal — necesita catálogos estelares reales para hacer matching, no solo estadística de imagen como hasta ahora.

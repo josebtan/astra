@@ -35,6 +35,7 @@ import com.astra.core.storage.db.AstraDatabase
 import com.astra.core.storage.db.RoomSessionRepository
 import com.astra.raw.DngTiffReader
 import com.astra.registration.RegistrationEngine
+import com.astra.quality.FrameRanker
 import com.astra.stacking.StackingEngine
 import com.astra.stacking.StackingMethod
 import kotlinx.coroutines.runBlocking
@@ -179,7 +180,7 @@ class CaptureActivity : Activity() {
 
         controls.addView(labButton("Capturar") { onCaptureButtonPressed() })
         controls.addView(labButton("Reintentar preview") { onRetryPreviewPressed() })
-        controls.addView(labButton("Procesar sesión (calibrar + alinear + stack)") {
+        controls.addView(labButton("Procesar sesión (calidad + calibrar + alinear + stack)") {
             runInBackground("Procesar sesión") { processSessionReport() }
         })
         controls.addView(labButton("Guardar sesión (Room)") {
@@ -367,9 +368,18 @@ class CaptureActivity : Activity() {
             return "Captura al menos un frame LIGHT antes de procesar la sesión."
         }
 
+        val ranking = FrameRanker.rank(lightImages)
+        val acceptedLights = ranking.accepted.map { it.image }
+        if (acceptedLights.isEmpty()) {
+            return buildString {
+                appendLine("Ningún frame LIGHT pasó el control de calidad automático - no hay nada que calibrar/stackear.")
+                append(ranking.toUserMessage())
+            }
+        }
+
         val calibratedLights = mutableListOf<LinearImage>()
         var lastCalibrationReport: CalibrationReport? = null
-        for (light in lightImages) {
+        for (light in acceptedLights) {
             val calibration = CalibrationEngine.calibrate(light, biasImages, darkImages, flatImages)
             calibratedLights.add(calibration.calibratedImage)
             lastCalibrationReport = calibration.report
@@ -383,7 +393,9 @@ class CaptureActivity : Activity() {
         val stackResult = StackingEngine.stack(registrationResult.alignedFrames, StackingMethod.SIGMA_CLIP)
 
         return buildString {
-            appendLine("Frames LIGHT procesados: ${lightImages.size} (con ${biasImages.size} bias, ${darkImages.size} dark, ${flatImages.size} flat disponibles)")
+            append(ranking.toUserMessage())
+            appendLine()
+            appendLine("Frames LIGHT usados: ${acceptedLights.size}/${lightImages.size} (con ${biasImages.size} bias, ${darkImages.size} dark, ${flatImages.size} flat disponibles)")
             appendLine()
             appendLine("Calibración (reporte del último LIGHT procesado):")
             append(lastCalibrationReport?.toUserMessage() ?: "N/A")
